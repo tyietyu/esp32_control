@@ -7,7 +7,9 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "driver/gpio.h"
-#include "esp_adc/adc_continuous.h"
+
+
+static const char *TAG = "INPUT_DRIVER";
 
 // limitStop Switch GPIO Definitions
 #define limitStop_IO1           GPIO_NUM_32
@@ -23,20 +25,7 @@
 #define KEYX        GPIO_NUM_4
 #define KEYY        GPIO_NUM_5
 
-//ADC Definitions
-#define ADC1_CHAN1      ADC_CHANNEL_0 // GPIO36
-#define ADC1_CHAN2      ADC_CHANNEL_3 // GPIO39
-#define ADC1_CHANx      ADC_CHANNEL_6 // GPIO34
-#define ADC1_CHANy      ADC_CHANNEL_7 // GPIO35
 
-#define ADC_UNIT                            ADC_UNIT_1
-#define ADC_UNIT_STR(unit)                  #unit
-#define ADC_GET_CHANNEL(p_data)             ((p_data)->type1.channel)
-#define ADC_GET_DATA(p_data)                ((p_data)->type1.data)
-#define ADC_READ_LEN                        256
-
-static adc_channel_t channel[4] = {ADC1_CHAN1, ADC1_CHAN2, ADC1_CHANx, ADC1_CHANy};
-static TaskHandle_t s_task_handle;
 
 esp_err_t limitStop_IO_init(void)
 {
@@ -109,6 +98,7 @@ uint8_t read_key_level(uint8_t key_num)
     }
 }
 
+static TaskHandle_t s_task_handle;
 bool IRAM_ATTR s_conv_done_cb(adc_continuous_handle_t handle, const adc_continuous_evt_data_t *edata, void *user_data)
 {
     BaseType_t mustYield = pdFALSE;

@@ -6,6 +6,7 @@
 #include "driver/gpio.h"
 #include "esp_rom_sys.h"
 
+const static char *TAG = "DISPLAY_DRIVER";
 
 #define TM1637_SCL          GPIO_NUM_23
 #define TM1637_SDA          GPIO_NUM_22             
