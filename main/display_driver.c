@@ -87,28 +87,14 @@ static void tm1637_write_byte(uint8_t byte)
     gpio_set_direction(TM1637_SDA, GPIO_MODE_INPUT);
     gpio_set_level(TM1637_SCL, 1);
     esp_rom_delay_us(TM1637_DELAY_US);
+    gpio_set_level(TM1637_SCL, 0);
+    esp_rom_delay_us(TM1637_DELAY_US);
     // ACK is when SDA is pulled low by the chip
     gpio_set_direction(TM1637_SDA, GPIO_MODE_OUTPUT);
     gpio_set_level(TM1637_SCL, 0);
-    esp_rom_delay_us(TM1637_DELAY_US);
 }
 
-void display_init(void) 
-{
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << TM1637_SCL) | (1ULL << TM1637_SDA),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .od_en = GPIO_OPEN_DRAIN_ENABLE, 
-    };
-    gpio_config(&io_conf);
-
-    tm1637_start();
-    tm1637_write_byte(display_cmd);
-    tm1637_stop();
-}
-
-void display_set_number(uint16_t number) 
+static void display_set_number_dot(uint16_t number, uint8_t dot_mask)
 {
     if (number > 9999) return; 
 
@@ -117,6 +103,48 @@ void display_set_number(uint16_t number)
     display_data[1] = segment_map[(number / 100) % 10];
     display_data[2] = segment_map[(number / 10) % 10];
     display_data[3] = segment_map[number % 10];
+
+
+    bool needs_leading_zero = false;
+    if (((dot_mask & 0x08) && number < 1000) || ((dot_mask & 0x04) && number < 100)  || ((dot_mask & 0x02) && number < 10)) 
+    {  
+        needs_leading_zero = true;
+    }
+    
+    if (number < 1000) 
+    {
+        display_data[0] = 0x00;
+        if (needs_leading_zero && number >= 100) 
+        {
+            display_data[0] = segment_map[0];
+        }
+    }
+
+    if (number < 100)
+    {
+        display_data[0] = 0x00;
+        display_data[1] = 0x00;
+        if (needs_leading_zero && number >= 10)
+        {
+            display_data[1] = segment_map[0];
+        }
+    }
+
+    if (number < 10)
+    {
+        display_data[0] = 0x00;
+        display_data[1] = 0x00;
+        display_data[2] = 0x00;
+        if (needs_leading_zero)
+        {
+            display_data[2] = segment_map[0];
+        }
+    }
+
+    if (dot_mask & 0x08) display_data[0] |= 0x80; 
+    if (dot_mask & 0x04) display_data[1] |= 0x80;
+    if (dot_mask & 0x02) display_data[2] |= 0x80;
+    if (dot_mask & 0x01) display_data[3] |= 0x80;
 
     // Set data mode
     tm1637_start();
@@ -132,6 +160,45 @@ void display_set_number(uint16_t number)
     tm1637_stop();
 }
 
+void display_set_float(float number)
+{
+    if (number > 9999.0f) 
+    {
+        number = 9999.0f;
+    }
+    if (number < 0) 
+    {
+        display_clear(); 
+        return;
+    }
+
+    uint16_t display_num;
+    uint8_t dot_mask = 0x00;
+
+    if (number < 10.0f) 
+    {
+        dot_mask = 0x08;
+        display_num = (uint16_t)round(number * 1000.0f);
+    } 
+    else if (number < 100.0f) 
+    {
+        dot_mask = 0x04;
+        display_num = (uint16_t)round(number * 100.0f);
+    } 
+    else if (number < 1000.0f) 
+    {
+        dot_mask = 0x02;
+        display_num = (uint16_t)round(number * 10.0f);
+    } 
+    else 
+    {
+        dot_mask = 0x00;
+        display_num = (uint16_t)round(number);
+    }
+    display_set_number_dot(display_num, dot_mask);
+}
+
+
 void display_clear(void)
 { 
     tm1637_start();
@@ -145,3 +212,23 @@ void display_clear(void)
     }
     tm1637_stop();
 }
+
+void display_init(void) 
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << TM1637_SCL) | (1ULL << TM1637_SDA),
+        .mode = GPIO_MODE_OUTPUT_OD, 
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    gpio_set_level(TM1637_SCL, 1);
+    gpio_set_level(TM1637_SDA, 1);
+    esp_rom_delay_us(TM1637_DELAY_US);
+
+    tm1637_start();
+    tm1637_write_byte(display_cmd);
+    tm1637_stop();
+}
+
