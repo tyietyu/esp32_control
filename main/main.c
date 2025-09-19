@@ -42,8 +42,8 @@ void display_task(void *pvParameters)
     while (1) {
         if (xQueueReceive(adc_data_queue, &adc_value, portMAX_DELAY)) {
             // 将ADC值 (0-4095) 转换为速度 (0-30 m/s)
-            uint16_t speed = (adc_value * 300) / 4095;
-            display_set_number(speed); 
+            float speed = (float)adc_value * 300 / 4095;
+            display_set_float(speed); 
         }
     }
 }
