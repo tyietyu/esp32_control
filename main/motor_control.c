@@ -3,8 +3,12 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
-#include "driver/mcpwm_prelude.h"
 #include "driver/gpio.h"
+#include "esp_timer.h"
+#include "driver/mcpwm_prelude.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 
 const static char *TAG = "MOTOR_CONTROL";
 
@@ -36,6 +40,8 @@ static mcpwm_timer_handle_t timer = NULL;
 static motor_handle_t motors[3]; // 3个电机
 static esp_timer_handle_t motor_timers[3];
 
+void motor_stop(int motor_index);
+
 /**
  * @brief 定时器到期后执行的回调函数
  * 这个函数会在esp_timer的专用任务中被调用
@@ -44,7 +50,7 @@ static esp_timer_handle_t motor_timers[3];
 static void motor_timer_callback(void* arg)
 {
     int motor_index = (int)arg;
-    ESP_LOGI(TAG, "定时器到期，停止电机 %d", motor_index);
+    ESP_LOGI(TAG, "timer end ,stop motor %d", motor_index);
     motor_stop(motor_index);
 }
 
@@ -70,7 +76,8 @@ void motor_init(void)
     for (int i = 0; i < 3; i++)
     {
         mcpwm_operator_config_t operator_config = {
-            .group_id = 0
+            .group_id = 0,
+            .flags.update_dead_time_on_tez = true,
         };
         ESP_ERROR_CHECK(mcpwm_new_operator(&operator_config, &motors[i].oper));
         ESP_ERROR_CHECK(mcpwm_operator_connect_timer(motors[i].oper, timer));
@@ -122,6 +129,8 @@ void motor_init(void)
     // 3. 启动共享的MCPWM定时器
     ESP_ERROR_CHECK(mcpwm_timer_enable(timer));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer, MCPWM_TIMER_START_NO_STOP));
+
+    ESP_LOGI(TAG, "motor initialized successfully.");
 }
 
 /**
@@ -132,7 +141,13 @@ void motor_init(void)
 void motor_forward_for_duration(int motor_index, uint32_t duration_ms)
 {
     if (motor_index < 0 || motor_index > 2) return;
-    ESP_LOGI(TAG, "电机 %d 正转，持续 %d ms", motor_index, duration_ms);
+    ESP_LOGI(TAG, "motor  %d forward, duration %u ms", (int)motor_index, (int)duration_ms);
+
+    if (esp_timer_is_active(motor_timers[motor_index])) 
+    {
+        esp_timer_stop(motor_timers[motor_index]);
+    }
+
     mcpwm_dead_time_config_t dead_time_config = { .flags.invert_output = false };
     ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(motors[motor_index].gen_a, motors[motor_index].gen_a, &dead_time_config));
     // 启动一次性定时器，时间单位是微秒
@@ -147,7 +162,13 @@ void motor_forward_for_duration(int motor_index, uint32_t duration_ms)
 void motor_reverse_for_duration(int motor_index, uint32_t duration_ms)
 {
     if (motor_index < 0 || motor_index > 2) return;
-    ESP_LOGI(TAG, "电机 %d 反转，持续 %d ms", motor_index, duration_ms);
+    ESP_LOGI(TAG, "motor %d reverse, duration %u ms", (int)motor_index, (int)duration_ms);
+
+    if (esp_timer_is_active(motor_timers[motor_index]))
+    {
+        esp_timer_stop(motor_timers[motor_index]);
+    }
+
     mcpwm_dead_time_config_t dead_time_config = { .flags.invert_output = true };
     ESP_ERROR_CHECK(mcpwm_generator_set_dead_time(motors[motor_index].gen_a, motors[motor_index].gen_a, &dead_time_config));
     // 启动一次性定时器，时间单位是微秒

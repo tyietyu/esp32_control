@@ -92,7 +92,7 @@ void random_mode_task(void *pvParameters)
     while(1) {
         // 等待随机模式触发信号
         xSemaphoreTake(g_random_trigger, portMAX_DELAY);
-        ESP_LOGI(TAG, "随机模式任务开始...");
+        ESP_LOGI(TAG, "random mode task started...");
 
         int64_t start_time = esp_timer_get_time();
         // 持续5秒
@@ -118,8 +118,8 @@ void random_mode_task(void *pvParameters)
         // 5秒后停止电机2和3
         motor_stop(1);
         motor_stop(2);
-        ESP_LOGI(TAG, "随机模式结束，准备触发发射...");
-        
+        ESP_LOGI(TAG, "random mode ended, preparing to trigger launch...");
+
         // 触发发射任务
         xSemaphoreGive(g_launch_trigger);
     }
@@ -166,17 +166,17 @@ void control_task(void *pvParameters)
                 { 
                     g_current_state = STATE_LAUNCHING;
                     xSemaphoreGive(g_launch_trigger); // 触发发射任务
-                    ESP_LOGI(TAG, "状态切换: IDLE -> LAUNCHING");
+                    ESP_LOGI(TAG, "state change: IDLE -> LAUNCHING");
                 } else if (read_key_level(2) == 0)  // 按键2按下
                 { 
                     g_current_state = STATE_RANDOM_MODE;
                     xSemaphoreGive(g_random_trigger); // 触发随机任务
-                    ESP_LOGI(TAG, "状态切换: IDLE -> RANDOM_MODE");
+                    ESP_LOGI(TAG, "state change: IDLE -> RANDOM_MODE");
                 } else if (adc_joy_x < JOYSTICK_DEADZONE_LOW || adc_joy_x > JOYSTICK_DEADZONE_HIGH ||
                            adc_joy_y < JOYSTICK_DEADZONE_LOW || adc_joy_y > JOYSTICK_DEADZONE_HIGH)
              {
                     g_current_state = STATE_MANUAL_AIM; // 摇杆被触动
-                    ESP_LOGI(TAG, "状态切换: IDLE -> MANUAL_AIM");
+                    ESP_LOGI(TAG, "state change: IDLE -> MANUAL_AIM");
                 }
                 break;
 
@@ -205,7 +205,7 @@ void control_task(void *pvParameters)
                     g_current_state = STATE_IDLE;
                     motor_stop(1);
                     motor_stop(2);
-                    ESP_LOGI(TAG, "状态切换: MANUAL_AIM -> IDLE");
+                    ESP_LOGI(TAG, "state change: MANUAL_AIM -> IDLE");
                 }
                 break;
 
@@ -222,31 +222,30 @@ void control_task(void *pvParameters)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "初始化硬件驱动...");
+    ESP_LOGI(TAG, "init hardware drivers...");
     limitStop_IO_init();
     key_init();
     display_init();
-    motor_init();
+    motor_init(); //电机ID范围为0，1，2 ---> 对应电机1，2，3
     
-    ESP_LOGI(TAG, "初始化ADC...");
-    continuous_adc_init(channel, 4, &adc_handle);
+    ESP_LOGI(TAG, "init ADC...");
+    continuous_adc_init(adc_channel, 4, &adc_handle);
     adc_continuous_start(adc_handle);
 
     // --- 3. 初始化FreeRTOS组件 ---
-    ESP_LOGI(TAG, "初始化FreeRTOS组件...");
+    ESP_LOGI(TAG, "init FreeRTOS...");
     g_state_mutex = xSemaphoreCreateMutex();
     g_launch_trigger = xSemaphoreCreateBinary();
     g_random_trigger = xSemaphoreCreateBinary();
     adc_data_queue = xQueueCreate(10, sizeof(uint32_t));
 
     // --- 4. 创建所有任务 ---
-    ESP_LOGI(TAG, "创建任务...");
-    xTaskCreate(display_task, "display_task", 2048, NULL, 5, NULL);
-    xTaskCreate(launch_task, "launch_task", 2048, NULL, 10, NULL);
+    ESP_LOGI(TAG, "create tasks...");
+    xTaskCreate(display_task, "display_task", 2048, NULL, 7, NULL);
+    xTaskCreate(launch_task, "launch_task", 2048, NULL, 5, NULL);
     xTaskCreate(random_mode_task, "random_mode_task", 2048, NULL, 10, NULL);
-    xTaskCreate(control_task, "control_task", 4096, NULL, 10, NULL);
-
-    ESP_LOGI(TAG, "系统初始化完成，进入主循环。");
+    xTaskCreate(control_task, "control_task", 4096, NULL, 6, NULL);
+    ESP_LOGI(TAG, "init completed. System is now running.");
 
 }
 

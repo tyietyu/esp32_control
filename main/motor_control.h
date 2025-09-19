@@ -1,6 +1,8 @@
 #ifndef _MOTOR_CONTROL_H_
 #define _MOTOR_CONTROL_H_
 
+#include <stdio.h>
+#include <string.h>
 
 void motor_init(void);
 void motor_forward_for_duration(int motor_index, uint32_t duration_ms); 

@@ -5,6 +5,8 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "esp_rom_sys.h"
+#include <math.h>
+#include "esp_timer.h"
 
 const static char *TAG = "DISPLAY_DRIVER";
 
@@ -110,7 +112,7 @@ static void display_set_number_dot(uint16_t number, uint8_t dot_mask)
     {  
         needs_leading_zero = true;
     }
-    
+
     if (number < 1000) 
     {
         display_data[0] = 0x00;
@@ -230,5 +232,7 @@ void display_init(void)
     tm1637_start();
     tm1637_write_byte(display_cmd);
     tm1637_stop();
+
+    ESP_LOGI(TAG, "TM1637 initialized successfully.");
 }
 

@@ -1,12 +1,4 @@
 #include "input_driver.h"
-#include <stdio.h>
-#include <string.h>
-#include "sdkconfig.h"
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "driver/gpio.h"
 
 
 static const char *TAG = "INPUT_DRIVER";
@@ -36,7 +28,9 @@ esp_err_t limitStop_IO_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .pull_up_en = GPIO_PULLUP_ENABLE,
     };
+
     ESP_ERROR_CHECK(gpio_config(&limitStop_io_conf));
+    return ESP_OK;
 }
 
 esp_err_t key_init(void)
@@ -47,7 +41,9 @@ esp_err_t key_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .pull_up_en = GPIO_PULLUP_ENABLE,
     };
+
     ESP_ERROR_CHECK(gpio_config(&key_io_conf));
+    return ESP_OK;
 }
 
 uint8_t read_limitStop_IO_level(uint8_t limitStop_IO_num)
@@ -75,6 +71,7 @@ uint8_t read_limitStop_IO_level(uint8_t limitStop_IO_num)
     default:
     break;
     }
+    return ESP_OK;
 }
 
 uint8_t read_key_level(uint8_t key_num)
@@ -96,10 +93,12 @@ uint8_t read_key_level(uint8_t key_num)
     default:
     break;
     }
+    return ESP_OK;
 }
 
 static TaskHandle_t s_task_handle;
-bool IRAM_ATTR s_conv_done_cb(adc_continuous_handle_t handle, const adc_continuous_evt_data_t *edata, void *user_data)
+adc_channel_t adc_channel[4] = {ADC1_CHAN1, ADC1_CHAN2, ADC1_CHANx, ADC1_CHANy};
+bool  s_conv_done_cb(adc_continuous_handle_t handle, const adc_continuous_evt_data_t *edata, void *user_data)
 {
     BaseType_t mustYield = pdFALSE;
     vTaskNotifyGiveFromISR(s_task_handle, &mustYield);
@@ -127,7 +126,7 @@ void continuous_adc_init(adc_channel_t *channel, uint8_t channel_num, adc_contin
     dig_cfg.pattern_num = channel_num;
     for (int i = 0; i < channel_num; i++)
     {
-        adc_pattern[i].atten = ADC_ATTEN_DB_11;
+        adc_pattern[i].atten = ADC_ATTEN_DB_0;
         adc_pattern[i].channel = channel[i] & 0x7;
         adc_pattern[i].unit = ADC_UNIT;
         adc_pattern[i].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
@@ -136,4 +135,6 @@ void continuous_adc_init(adc_channel_t *channel, uint8_t channel_num, adc_contin
     ESP_ERROR_CHECK(adc_continuous_config(handle, &dig_cfg));
 
     *out_handle = handle;
+
+    ESP_LOGI(TAG, "ADC initialized successfully.");
 }
