@@ -32,7 +32,7 @@ SemaphoreHandle_t g_random_trigger;
 static adc_continuous_handle_t adc_handle = NULL;
 static QueueHandle_t adc_data_queue;
 
-
+#if 1
 //================================================================================
 // 任务 1: 数码管显示任务
 //================================================================================
@@ -249,3 +249,41 @@ void app_main(void)
 
 }
 
+#endif
+
+#if 0
+void app_main()
+{
+    motor_init(); 
+    while (1)
+    {
+        // //电机3正转5秒
+        // motor_forward_for_duration(2, 5000);
+        // ESP_LOGI(TAG, "motor 3 forward for 5 seconds");
+        // vTaskDelay(pdMS_TO_TICKS(2000));
+        // //电机3反转5秒
+        // motor_reverse_for_duration(2, 5000);
+        // ESP_LOGI(TAG, "motor 3 reverse for 5 seconds");
+        // vTaskDelay(pdMS_TO_TICKS(2000));
+
+        //电机2正转5秒
+        motor_forward_for_duration(1, 5000);
+        ESP_LOGI(TAG, "motor 2 forward for 5 seconds");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        //电机2反转5秒
+        motor_reverse_for_duration(1, 5000);
+        ESP_LOGI(TAG, "motor 2 reverse for 5 seconds");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
+        // //电机1正转5秒
+        // motor_forward_for_duration(0, 5000);
+        // ESP_LOGI(TAG, "motor 1 forward for 5 seconds");
+        // vTaskDelay(pdMS_TO_TICKS(2000));
+        // //电机1反转5秒
+        // motor_reverse_for_duration(0, 5000);
+        // ESP_LOGI(TAG, "motor 1 reverse for 5 seconds");
+        // vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+#endif
