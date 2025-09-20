@@ -1,6 +1,5 @@
 #include "input_driver.h"
 
-
 static const char *TAG = "INPUT_DRIVER";
 
 // limitStop Switch GPIO Definitions
@@ -16,7 +15,6 @@ static const char *TAG = "INPUT_DRIVER";
 #define KEY2        GPIO_NUM_13
 #define KEYX        GPIO_NUM_4
 #define KEYY        GPIO_NUM_5
-
 
 
 esp_err_t limitStop_IO_init(void)
