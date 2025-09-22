@@ -23,7 +23,8 @@ typedef enum
     STATE_IDLE,       // 空闲状态
     STATE_MANUAL_AIM, // 手动摇杆控制状态
     STATE_LAUNCHING,  // 发射流程状态
-    STATE_RANDOM_MODE // 随机模式状态
+    STATE_RANDOM_MODE, // 随机模式状态
+    STATE_MOVING_TO_LIMIT1 // 移动到限位1状态
 } system_state_t;
 
 volatile system_state_t g_current_state = STATE_IDLE;
@@ -150,6 +151,7 @@ void control_task(void *pvParameters)
     uint32_t ret_num = 0;
     uint32_t adc_joy_x = 2028;
     uint32_t adc_joy_y = 2048;
+    uint32_t pot_val = 0; // 电位器值
 
     // 摇杆死区定义
     const int JOYSTICK_DEADZONE_LOW = 1500;
@@ -167,30 +169,32 @@ void control_task(void *pvParameters)
 
             if (chan == ADC1_CHAN1)
             {
-                xQueueSend(adc_data_queue, &data, 0);
-                ESP_LOGI(TAG, "ADC1_CHAN1: %d", (int)data);
+                pot_val = data;
             }
             else if (chan == ADC1_CHANx)
             {
                 adc_joy_x = data;
-                ESP_LOGI(TAG, "ADC1_CHANx: %d", (int)adc_joy_x);
             }
             else if (chan == ADC1_CHANy)
             {
                 adc_joy_y = data;
-                ESP_LOGI(TAG, "ADC1_CHANy: %d", (int)adc_joy_y);
             }
         }
-
+        
+        if (ret_num > 0) 
+        { 
+            xQueueSend(adc_data_queue, &pot_val, 0);
+        }
         xSemaphoreTake(g_state_mutex, portMAX_DELAY);
         switch (g_current_state)
         {
         case STATE_IDLE:
-            if ((read_key_level(2) == 0) && (read_limitStop_IO_level(1) == 0)) // 按键1按下且限位1触发
+            if (read_key_level(2) == 0)
             {
-                g_current_state = STATE_LAUNCHING;
-                xSemaphoreGive(g_launch_trigger); // 触发发射任务
-                ESP_LOGI(TAG, "state change: IDLE -> LAUNCHING");
+                ESP_LOGI(TAG, "按键1按下，电机启动，移向限位器1...");
+                motor_forward_for_duration(0, 5000); // 假设是电机0正转，持续5000ms
+                g_current_state = STATE_MOVING_TO_LIMIT1; // 切换到新状态
+                ESP_LOGI(TAG, "state change: IDLE -> MOVING_TO_LIMIT1");
             }
             else if (read_key_level(3) == 0) // 按键2按下
             {
@@ -246,6 +250,16 @@ void control_task(void *pvParameters)
             }
             break;
 
+        case STATE_MOVING_TO_LIMIT1:
+        if (read_limitStop_IO_level(1) == 0) // 限位器1被触发 (变为低电平)
+        {
+            ESP_LOGI(TAG, "触发限位器1，电机停止。");
+            motor_stop(0); // 停止电机0
+            g_current_state = STATE_IDLE; // 切换回空闲状态
+            ESP_LOGI(TAG, "state change: MOVING_TO_LIMIT1 -> IDLE");
+        }
+        break;
+
         case STATE_LAUNCHING:
             break;
         case STATE_RANDOM_MODE:
@@ -253,6 +267,7 @@ void control_task(void *pvParameters)
         }
 
         xSemaphoreGive(g_state_mutex);
+        ESP_LOGI(TAG, "JoyX: %d, JoyY: %d, Pot: %d", (int)adc_joy_x, (int)adc_joy_y, (int)pot_val); // 打印摇杆和电位器的值
         vTaskDelay(pdMS_TO_TICKS(50)); // 每50ms扫描一次
     }
 }
