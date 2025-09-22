@@ -155,7 +155,7 @@ void test(void)
 void motor_start_forward(uint8_t motor_index)
 {
     if (motor_index >= 3) return;
-    ESP_LOGI(TAG, "Motor %d START FORWARD", motor_index);
+    // ESP_LOGI(TAG, "Motor %d START FORWARD", motor_index);
     ESP_ERROR_CHECK(bdc_motor_forward(motors[motor_index]));
     ESP_ERROR_CHECK(bdc_motor_set_speed(motors[motor_index], MOTOR_SPEED_TICKS));
 }
@@ -164,7 +164,7 @@ void motor_start_forward(uint8_t motor_index)
 void motor_start_reverse(uint8_t motor_index)
 {
     if (motor_index >= 3) return;
-    ESP_LOGI(TAG, "Motor %d START REVERSE", motor_index);
+    // ESP_LOGI(TAG, "Motor %d START REVERSE", motor_index);
     ESP_ERROR_CHECK(bdc_motor_reverse(motors[motor_index]));
     ESP_ERROR_CHECK(bdc_motor_set_speed(motors[motor_index], MOTOR_SPEED_TICKS));
 }
