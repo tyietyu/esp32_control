@@ -24,7 +24,6 @@ typedef enum
     STATE_MANUAL_AIM, // 手动摇杆控制状态
     STATE_LAUNCHING,  // 发射流程状态
     STATE_RANDOM_MODE, // 随机模式状态
-    STATE_MOVING_TO_LIMIT1 // 移动到限位1状态
 } system_state_t;
 
 volatile system_state_t g_current_state = STATE_IDLE;
@@ -189,11 +188,18 @@ void control_task(void *pvParameters)
         switch (g_current_state)
         {
         case STATE_IDLE:
-            if (read_key_level(2) == 0)
+            if ((read_key_level(2) == 0) && (read_limitStop_IO_level(1) == 1)) // 按键1按下且限位器1未触发
             {
                 ESP_LOGI(TAG, "按键1按下，电机启动，移向限位器1...");
                 motor_forward_for_duration(0, 5000); // 假设是电机0正转，持续5000ms
-                g_current_state = STATE_MOVING_TO_LIMIT1; // 切换到新状态
+
+                if (read_limitStop_IO_level(1) == 0) // 限位器1被触发 (变为低电平)
+                {
+                    ESP_LOGI(TAG, "触发限位器1，电机停止。");
+                    motor_stop(0); // 停止电机0
+                    g_current_state = STATE_IDLE; // 切换回空闲状态
+                    ESP_LOGI(TAG, "state change: MOVING_TO_LIMIT1 -> IDLE");
+                }
                 ESP_LOGI(TAG, "state change: IDLE -> MOVING_TO_LIMIT1");
             }
             else if (read_key_level(3) == 0) // 按键2按下
@@ -249,17 +255,6 @@ void control_task(void *pvParameters)
                 ESP_LOGI(TAG, "state change: MANUAL_AIM -> IDLE");
             }
             break;
-
-        case STATE_MOVING_TO_LIMIT1:
-        if (read_limitStop_IO_level(1) == 0) // 限位器1被触发 (变为低电平)
-        {
-            ESP_LOGI(TAG, "触发限位器1，电机停止。");
-            motor_stop(0); // 停止电机0
-            g_current_state = STATE_IDLE; // 切换回空闲状态
-            ESP_LOGI(TAG, "state change: MOVING_TO_LIMIT1 -> IDLE");
-        }
-        break;
-
         case STATE_LAUNCHING:
             break;
         case STATE_RANDOM_MODE:
