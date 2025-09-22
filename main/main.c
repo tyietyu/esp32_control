@@ -187,6 +187,7 @@ void control_task(void *pvParameters)
         switch (g_current_state)
         {
         case STATE_IDLE:
+            ESP_LOGI(TAG, "当前状态：空闲");
             if ((read_key_level(2) == 0) && (read_limitStop_IO_level(1) == 0)) // 按键1按下且限位器1触发
             {
                 ESP_LOGI(TAG, "按键1按下，电机启动，移向限位器1...");
