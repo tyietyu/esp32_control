@@ -106,22 +106,22 @@ void random_mode_task(void *pvParameters)
         {
             // 随机决定电机2的动作
             int motor2_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 0))
+            if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 1))
             {
                 motor_forward_for_duration(1, 5000); // 正转5000ms
             }
-            else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 0))
+            else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 1))
             {
                 motor_reverse_for_duration(1, 5000); // 反转5000ms
             }
 
             // 随机决定电机3的动作
             int motor3_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor3_action == 1) && (read_limitStop_IO_level(5) ==  0))
+            if ((motor3_action == 1) && (read_limitStop_IO_level(5) == 1))
             {
                 motor_forward_for_duration(2, 5000); // 正转5000ms
             }
-            else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 0))
+            else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 1))
             {
                 motor_reverse_for_duration(2, 5000); // 反转5000ms
             }
@@ -208,27 +208,43 @@ void control_task(void *pvParameters)
 
         case STATE_MANUAL_AIM:
             // 摇杆X轴控制电机2
-            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(3) == 0))
+            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(3) == 1))
             {
                 motor_forward_for_duration(1, 5000); // 持续发送指令保持转动
+                if(read_limitStop_IO_level(3) == 0)
+                {
+                    motor_stop(1); // 如果触发限位器3，立即停止电机2
+                }
             }
-            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(4) == 0))
+            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(4) == 1))
             {
                 motor_reverse_for_duration(1, 5000);
+                if(read_limitStop_IO_level(4) == 0)
+                {
+                    motor_stop(1); // 如果触发限位器4，立即停止电机2
+                }
             }
             else
             {
-                motor_stop(2);
+                motor_stop(1); // 摇杆不在有效范围内，停止电机2
             }
 
             // 摇杆Y轴控制电机3
-            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(5) == 0))
+            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(5) == 1))
             {
                 motor_forward_for_duration(2, 5000); // 向上
+                if(read_limitStop_IO_level(5) == 0)
+                {
+                    motor_stop(2); // 如果触发限位器5，立即停止电机3
+                }
             }
-            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(6) == 0))
+            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(6) == 1))
             {
                 motor_reverse_for_duration(2, 5000); // 向下
+                if(read_limitStop_IO_level(6) == 0)
+                {
+                    motor_stop(2); // 如果触发限位器6，立即停止电机3
+                }
             }
             else
             {
