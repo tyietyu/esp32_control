@@ -68,7 +68,7 @@ void launch_task(void *pvParameters)
         // 1. 电机1正转，直到触发限位器2
         ESP_LOGI(TAG, "电机1正转...");
         motor_forward_for_duration(0, 60000); // 启动电机1，设置一个超长时间
-        while (read_limitStop_IO_level(2) == 1)
+        while (read_limitStop_IO_level(2) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器2触发 (低电平)
         }
@@ -78,7 +78,7 @@ void launch_task(void *pvParameters)
         // 2. 电机1反转，直到触发限位器1
         ESP_LOGI(TAG, "电机1反转...");
         motor_reverse_for_duration(0, 60000); // 启动电机1反转
-        while (read_limitStop_IO_level(1) == 1)
+        while (read_limitStop_IO_level(1) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器1触发 (低电平)
         }
@@ -109,22 +109,22 @@ void random_mode_task(void *pvParameters)
         {
             // 随机决定电机2的动作
             int motor2_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 1))
+            if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 0))
             {
                 motor_forward_for_duration(1, 5000); // 正转5000ms
             }
-            else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 1))
+            else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 0))
             {
                 motor_reverse_for_duration(1, 5000); // 反转5000ms
             }
 
             // 随机决定电机3的动作
             int motor3_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor3_action == 1) && (read_limitStop_IO_level(5) == 1))
+            if ((motor3_action == 1) && (read_limitStop_IO_level(5) ==  0))
             {
                 motor_forward_for_duration(2, 5000); // 正转5000ms
             }
-            else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 1))
+            else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 0))
             {
                 motor_reverse_for_duration(2, 5000); // 反转5000ms
             }
@@ -212,11 +212,11 @@ void control_task(void *pvParameters)
 
         case STATE_MANUAL_AIM:
             // 摇杆X轴控制电机2
-            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(3) == 1))
+            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(3) == 0))
             {
                 motor_forward_for_duration(1, 5000); // 持续发送指令保持转动
             }
-            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(4) == 1))
+            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(4) == 0))
             {
                 motor_reverse_for_duration(1, 5000);
             }
@@ -226,11 +226,11 @@ void control_task(void *pvParameters)
             }
 
             // 摇杆Y轴控制电机3
-            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(5) == 1))
+            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(5) == 0))
             {
                 motor_forward_for_duration(2, 5000); // 向上
             }
-            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(6) == 1))
+            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(6) == 0))
             {
                 motor_reverse_for_duration(2, 5000); // 向下
             }
