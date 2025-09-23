@@ -8,7 +8,6 @@ void motor_init(void);
 void motor_reverse_for_duration(uint8_t motor_index, uint32_t duration_ms);
 void motor_forward_for_duration(uint8_t motor_index, uint32_t duration_ms);
 void motor_stop(uint8_t motor_index);
-void test(void);
 
 void motor_start_forward(uint8_t motor_index);
 void motor_start_reverse(uint8_t motor_index);

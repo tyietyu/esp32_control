@@ -64,8 +64,8 @@ void launch_task(void *pvParameters)
 
         // 1. 电机1正转，直到触发限位器2
         ESP_LOGI(TAG, "电机1正转...");
-        motor_forward_for_duration(0, 60000); // 启动电机1，设置一个超长时间
-        while (read_limitStop_IO_level(2) == 0)
+        motor_start_forward(0); // 启动电机1正转
+        while (read_limitStop_IO_level(2) == 1)
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器2触发 (低电平)
         }
@@ -74,8 +74,8 @@ void launch_task(void *pvParameters)
 
         // 2. 电机1反转，直到触发限位器1
         ESP_LOGI(TAG, "电机1反转...");
-        motor_reverse_for_duration(0, 60000); // 启动电机1反转
-        while (read_limitStop_IO_level(1) == 0)
+        motor_start_reverse(0); // 启动电机1反转
+        while (read_limitStop_IO_level(1) == 1)
         {
             vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器1触发 (低电平)
         }
@@ -108,22 +108,22 @@ void random_mode_task(void *pvParameters)
             int motor2_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
             if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 1))
             {
-                motor_forward_for_duration(1, 5000); // 正转5000ms
+                motor_start_forward(1); // 正转
             }
             else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 1))
             {
-                motor_reverse_for_duration(1, 5000); // 反转5000ms
+                motor_start_reverse(1); // 反转
             }
 
             // 随机决定电机3的动作
             int motor3_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
             if ((motor3_action == 1) && (read_limitStop_IO_level(5) == 1))
             {
-                motor_forward_for_duration(2, 5000); // 正转5000ms
+                motor_start_forward(2); // 正转
             }
             else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 1))
             {
-                motor_reverse_for_duration(2, 5000); // 反转5000ms
+                motor_start_reverse(2); // 反转
             }
             vTaskDelay(pdMS_TO_TICKS(6000)); // 每6000ms改变一次动作
         }
@@ -146,13 +146,15 @@ void control_task(void *pvParameters)
     // 用于连续ADC读取的缓冲区
     uint8_t result[ADC_READ_LEN] = {0};
     uint32_t ret_num = 0;
-    uint32_t adc_joy_x = 2028;
-    uint32_t adc_joy_y = 2048;
+    uint32_t adc_joy_x = 1558;
+    uint32_t adc_joy_y = 1346;
     uint32_t pot_val = 0; // 电位器值
 
     // 摇杆死区定义
-    const int JOYSTICK_DEADZONE_LOW = 1500;
-    const int JOYSTICK_DEADZONE_HIGH = 3000;
+    const int JOYSTICK_DEADZONE_LOW_X = 1500;
+    const int JOYSTICK_DEADZONE_HIGH_X = 1600;
+    const int JOYSTICK_DEADZONE_LOW_Y = 1300;
+    const int JOYSTICK_DEADZONE_HIGH_Y = 1400;
 
     while (1)
     {
@@ -190,7 +192,7 @@ void control_task(void *pvParameters)
             ESP_LOGI(TAG, "当前状态：空闲");
             if ((read_key_level(2) == 0) && (read_limitStop_IO_level(1) == 0)) // 按键1按下且限位器1触发
             {
-                ESP_LOGI(TAG, "按键1按下，电机启动，移向限位器1...");
+                ESP_LOGI(TAG, "按键1按下,电机启动,移向限位器1...");
                 xSemaphoreGive(g_launch_trigger); // 触发发射任务
                 ESP_LOGI(TAG, "state change: IDLE -> LAUNCH_MODE");
             }
@@ -199,8 +201,8 @@ void control_task(void *pvParameters)
                 xSemaphoreGive(g_random_trigger); // 触发随机任务
                 ESP_LOGI(TAG, "state change: IDLE -> RANDOM_MODE");
             }
-            else if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) || (adc_joy_x > JOYSTICK_DEADZONE_HIGH) ||
-                     (adc_joy_y < JOYSTICK_DEADZONE_LOW) || (adc_joy_y > JOYSTICK_DEADZONE_HIGH))
+            else if ((adc_joy_x < JOYSTICK_DEADZONE_LOW_X) || (adc_joy_x > JOYSTICK_DEADZONE_HIGH_X) ||
+                     (adc_joy_y < JOYSTICK_DEADZONE_LOW_Y) || (adc_joy_y > JOYSTICK_DEADZONE_HIGH_Y))
             {
                 g_current_state = STATE_MANUAL_AIM; // 摇杆被触动
                 ESP_LOGI(TAG, "state change: IDLE -> MANUAL_AIM");
@@ -209,21 +211,13 @@ void control_task(void *pvParameters)
 
         case STATE_MANUAL_AIM:
             // 摇杆X轴控制电机2
-            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(3) == 1))
+            if ((adc_joy_x < JOYSTICK_DEADZONE_LOW_X) && (read_limitStop_IO_level(3) == 1))
             {
-                motor_forward_for_duration(1, 5000); // 持续发送指令保持转动
-                if(read_limitStop_IO_level(3) == 0)
-                {
-                    motor_stop(1); // 如果触发限位器3，立即停止电机2
-                }
+                motor_start_forward(1); 
             }
-            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(4) == 1))
+            else if ((adc_joy_x > JOYSTICK_DEADZONE_HIGH_X) && (read_limitStop_IO_level(4) == 1))
             {
-                motor_reverse_for_duration(1, 5000);
-                if(read_limitStop_IO_level(4) == 0)
-                {
-                    motor_stop(1); // 如果触发限位器4，立即停止电机2
-                }
+                motor_start_reverse(1);
             }
             else
             {
@@ -231,21 +225,13 @@ void control_task(void *pvParameters)
             }
 
             // 摇杆Y轴控制电机3
-            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW) && (read_limitStop_IO_level(5) == 1))
+            if ((adc_joy_y < JOYSTICK_DEADZONE_LOW_Y) && (read_limitStop_IO_level(5) == 1))
             {
-                motor_forward_for_duration(2, 5000); // 向上
-                if(read_limitStop_IO_level(5) == 0)
-                {
-                    motor_stop(2); // 如果触发限位器5，立即停止电机3
-                }
+                motor_start_forward(2);
             }
-            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH) && (read_limitStop_IO_level(6) == 1))
+            else if ((adc_joy_y > JOYSTICK_DEADZONE_HIGH_Y) && (read_limitStop_IO_level(6) == 1))
             {
-                motor_reverse_for_duration(2, 5000); // 向下
-                if(read_limitStop_IO_level(6) == 0)
-                {
-                    motor_stop(2); // 如果触发限位器6，立即停止电机3
-                }
+                motor_start_reverse(2);
             }
             else
             {
@@ -253,8 +239,8 @@ void control_task(void *pvParameters)
             }
 
             // 如果摇杆回中，则返回IDLE状态
-            if ((adc_joy_x >= JOYSTICK_DEADZONE_LOW) && (adc_joy_x <= JOYSTICK_DEADZONE_HIGH) &&
-                (adc_joy_y >= JOYSTICK_DEADZONE_LOW) && (adc_joy_y <= JOYSTICK_DEADZONE_HIGH))
+            if ((adc_joy_x >= JOYSTICK_DEADZONE_LOW_X) && (adc_joy_x <= JOYSTICK_DEADZONE_HIGH_X) &&
+                (adc_joy_y >= JOYSTICK_DEADZONE_LOW_Y) && (adc_joy_y <= JOYSTICK_DEADZONE_HIGH_Y))
             {
                 g_current_state = STATE_IDLE;
                 motor_stop(1);

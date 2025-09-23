@@ -135,27 +135,10 @@ void motor_stop(uint8_t motor_index)
     ESP_ERROR_CHECK(bdc_motor_brake(motors[motor_index]));
 }
 
-#if 0
-void test(void)
-{
-    //正转2s
-    // motor_start_forward(2);
-    motor_forward_for_duration(2, 10000);
-    vTaskDelay(pdMS_TO_TICKS(10000));
-    //停止
-    motor_stop(2);
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    //反转2s
-    motor_reverse_for_duration(2, 10000);
-    vTaskDelay(pdMS_TO_TICKS(10000));
-    //停止
-    motor_stop(2);
-}
-
+// 直接启动电机正转，不设定时间，直到手动调用 motor_stop
 void motor_start_forward(uint8_t motor_index)
 {
     if (motor_index >= 3) return;
-    // ESP_LOGI(TAG, "Motor %d START FORWARD", motor_index);
     ESP_ERROR_CHECK(bdc_motor_forward(motors[motor_index]));
     ESP_ERROR_CHECK(bdc_motor_set_speed(motors[motor_index], MOTOR_SPEED_TICKS));
 }
@@ -164,8 +147,6 @@ void motor_start_forward(uint8_t motor_index)
 void motor_start_reverse(uint8_t motor_index)
 {
     if (motor_index >= 3) return;
-    // ESP_LOGI(TAG, "Motor %d START REVERSE", motor_index);
     ESP_ERROR_CHECK(bdc_motor_reverse(motors[motor_index]));
     ESP_ERROR_CHECK(bdc_motor_set_speed(motors[motor_index], MOTOR_SPEED_TICKS));
 }
-#endif
