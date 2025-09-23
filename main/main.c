@@ -25,10 +25,6 @@ typedef enum
 } system_state_t;
 
 volatile system_state_t g_current_state = STATE_IDLE;
-SemaphoreHandle_t g_state_mutex;
-SemaphoreHandle_t g_launch_trigger;
-SemaphoreHandle_t g_random_trigger;
-
 static adc_continuous_handle_t adc_handle = NULL;
 static QueueHandle_t adc_data_queue;
 
@@ -53,89 +49,73 @@ void display_task(void *pvParameters)
 //================================================================================
 // 任务 2: 发射流程任务
 //================================================================================
-void launch_task(void *pvParameters)
+void launching_mode(void) 
 {
-    while (1)
+    ESP_LOGI(TAG, "发射任务开始...");
+
+    // 1. 电机1正转，直到触发限位器2
+    ESP_LOGI(TAG, "电机1正转...");
+    motor_start_forward(0); // 启动电机1正转
+    while (read_limitStop_IO_level(2) == 1)
     {
-        // 等待发射触发信号
-        xSemaphoreTake(g_launch_trigger, portMAX_DELAY);
-
-        ESP_LOGI(TAG, "发射任务开始...");
-
-        // 1. 电机1正转，直到触发限位器2
-        ESP_LOGI(TAG, "电机1正转...");
-        motor_start_forward(0); // 启动电机1正转
-        while (read_limitStop_IO_level(2) == 1)
-        {
-            vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器2触发 (低电平)
-        }
-        motor_stop(0); // 立即停止电机1
-        ESP_LOGI(TAG, "触发限位器2");
-
-        // 2. 电机1反转，直到触发限位器1
-        ESP_LOGI(TAG, "电机1反转...");
-        motor_start_reverse(0); // 启动电机1反转
-        while (read_limitStop_IO_level(1) == 1)
-        {
-            vTaskDelay(pdMS_TO_TICKS(20)); // 等待限位器1触发 (低电平)
-        }
-        motor_stop(0); // 立即停止电机1
-        ESP_LOGI(TAG, "触发限位器1,发射流程结束。");
-
-        // 流程结束，将状态切回IDLE
-        xSemaphoreTake(g_state_mutex, portMAX_DELAY);
-        g_current_state = STATE_IDLE;
-        xSemaphoreGive(g_state_mutex);
+        vTaskDelay(pdMS_TO_TICKS(10)); 
     }
+    motor_stop(0); // 立即停止电机1
+
+    ESP_LOGI(TAG, "触发限位器2");
+    // 2. 电机1反转，直到触发限位器1
+    ESP_LOGI(TAG, "电机1反转...");
+    motor_start_reverse(0); // 启动电机1反转
+    while (read_limitStop_IO_level(1) == 1)// 等待限位器1触发
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    } 
+    motor_stop(0); // 立即停止电机1
+
+    ESP_LOGI(TAG, "触发限位器1,发射流程结束。");
+    ESP_LOGI(TAG, "state change: LAUNCH_MODE -> IDLE"); // 发射流程结束，切换到空闲状态
+    g_current_state = STATE_IDLE;
 }
 
 //================================================================================
 // 任务 3: 随机模式任务
 //================================================================================
-void random_mode_task(void *pvParameters)
+void random_mode(void)
 {
-    while (1)
+    ESP_LOGI(TAG, "random mode task started...");
+
+    int64_t start_time = esp_timer_get_time();
+    // 持续5秒
+    while ((esp_timer_get_time() - start_time) < 5000000)
     {
-        // 等待随机模式触发信号
-        xSemaphoreTake(g_random_trigger, portMAX_DELAY);
-        ESP_LOGI(TAG, "random mode task started...");
-
-        int64_t start_time = esp_timer_get_time();
-        // 持续5秒
-        while ((esp_timer_get_time() - start_time) < 5000000)
+        // 随机决定电机2的动作
+        int motor2_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
+        if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 1))
         {
-            // 随机决定电机2的动作
-            int motor2_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor2_action == 1) && (read_limitStop_IO_level(3) == 1))
-            {
-                motor_start_forward(1); // 正转
-            }
-            else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 1))
-            {
-                motor_start_reverse(1); // 反转
-            }
-
-            // 随机决定电机3的动作
-            int motor3_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
-            if ((motor3_action == 1) && (read_limitStop_IO_level(5) == 1))
-            {
-                motor_start_forward(2); // 正转
-            }
-            else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 1))
-            {
-                motor_start_reverse(2); // 反转
-            }
-            vTaskDelay(pdMS_TO_TICKS(6000)); // 每6000ms改变一次动作
+            motor_start_forward(1); // 正转
+        }
+        else if ((motor2_action == 2) && (read_limitStop_IO_level(4) == 1))
+        {
+            motor_start_reverse(1); // 反转
         }
 
-        // 5秒后停止电机2和3
-        motor_stop(1);
-        motor_stop(2);
-        ESP_LOGI(TAG, "random mode ended, preparing to trigger launch...");
-
-        // 触发发射任务
-        xSemaphoreGive(g_launch_trigger);
+        // 随机决定电机3的动作
+        int motor3_action = rand() % 3; // 0: 停止, 1: 正转, 2: 反转
+        if ((motor3_action == 1) && (read_limitStop_IO_level(5) == 1))
+        {
+            motor_start_forward(2); // 正转
+        }
+        else if ((motor3_action == 2) && (read_limitStop_IO_level(6) == 1))
+        {
+            motor_start_reverse(2); // 反转
+        }
     }
+
+    // 5秒后停止电机2和3
+    motor_stop(1);
+    motor_stop(2);
+    ESP_LOGI(TAG, "state change: RANDOM_MODE -> IDLE");
+    g_current_state = STATE_IDLE;
 }
 
 //================================================================================
@@ -184,7 +164,6 @@ void control_task(void *pvParameters)
         { 
             xQueueSend(adc_data_queue, &pot_val, 0);
         }
-        xSemaphoreTake(g_state_mutex, portMAX_DELAY);
 
         switch (g_current_state)
         {
@@ -193,17 +172,20 @@ void control_task(void *pvParameters)
             if ((read_key_level(2) == 0) && (read_limitStop_IO_level(1) == 0)) // 按键1按下且限位器1触发
             {
                 ESP_LOGI(TAG, "按键1按下,电机启动,移向限位器1...");
-                xSemaphoreGive(g_launch_trigger); // 触发发射任务
+                launching_mode(); // 进入发射流程
+                // 发射流程结束后，状态会自动切换回IDLE
                 ESP_LOGI(TAG, "state change: IDLE -> LAUNCH_MODE");
             }
             else if (read_key_level(3) == 0) // 按键2按下
             {
-                xSemaphoreGive(g_random_trigger); // 触发随机任务
+                ESP_LOGI(TAG, "按键2按下,进入随机模式...");
+                random_mode(); // 进入随机模式
                 ESP_LOGI(TAG, "state change: IDLE -> RANDOM_MODE");
             }
             else if ((adc_joy_x < JOYSTICK_DEADZONE_LOW_X) || (adc_joy_x > JOYSTICK_DEADZONE_HIGH_X) ||
                      (adc_joy_y < JOYSTICK_DEADZONE_LOW_Y) || (adc_joy_y > JOYSTICK_DEADZONE_HIGH_Y))
             {
+                ESP_LOGI(TAG, "摇杆被触动,进入手动控制模式...");
                 g_current_state = STATE_MANUAL_AIM; // 摇杆被触动
                 ESP_LOGI(TAG, "state change: IDLE -> MANUAL_AIM");
             }
@@ -249,8 +231,6 @@ void control_task(void *pvParameters)
             }
             break;
         }
-
-        xSemaphoreGive(g_state_mutex);
         ESP_LOGI(TAG, "JoyX: %d, JoyY: %d, Pot: %d", (int)adc_joy_x, (int)adc_joy_y, (int)pot_val); // 打印摇杆和电位器的值
         vTaskDelay(pdMS_TO_TICKS(50)); // 每50ms扫描一次
     }
@@ -270,16 +250,11 @@ void app_main(void)
 
     // --- 3. 初始化FreeRTOS组件 ---
     ESP_LOGI(TAG, "init FreeRTOS...");
-    g_state_mutex = xSemaphoreCreateMutex();
-    g_launch_trigger = xSemaphoreCreateBinary();
-    g_random_trigger = xSemaphoreCreateBinary();
     adc_data_queue = xQueueCreate(10, sizeof(uint32_t));
 
     // --- 4. 创建所有任务 ---
     ESP_LOGI(TAG, "create tasks...");
-    xTaskCreate(display_task, "display_task", 2048, NULL, 6, NULL);
-    xTaskCreate(launch_task, "launch_task", 2048, NULL, 5, NULL);
-    xTaskCreate(random_mode_task, "random_mode_task", 2048, NULL, 4, NULL);
-    xTaskCreate(control_task, "control_task", 4096, NULL, 7, NULL);
+    xTaskCreate(display_task, "display_task", 2048, NULL, 10, NULL);
+    xTaskCreate(control_task, "control_task", 4096, NULL, 10, NULL);
     ESP_LOGI(TAG, "init completed. System is now running.");
 }
